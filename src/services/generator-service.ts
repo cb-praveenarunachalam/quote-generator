@@ -3,13 +3,12 @@ class GeneratorService {
   private protocol: string;
 
   constructor() {
-    this.hostName = '3b91-14-142-185-230.ngrok-free.app';
-    this.protocol = 'https';
+    this.hostName = 'localhost:8081';
+    this.protocol = 'http';
   }
 
   private postRequest(apiPath: string, requestBody: any): Promise<any> {
-    return fetch(`/${apiPath}`, {
-      mode: 'cors',
+    return fetch(`${this.protocol}://${this.hostName}/${apiPath}`, {
       method: 'post',
       headers: {
         'Accept': 'application/json',
