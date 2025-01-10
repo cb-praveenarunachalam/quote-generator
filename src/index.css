@@ -43,3 +43,7 @@ select {
 .bg-body-custom {
   background-color: #012A38;
 }
+
+.date-range-row {
+  background-color: #F4F5F7;
+}

@@ -198,8 +198,8 @@ function CreateQuote() {
               {
                 Object.keys(groupedItems).map((dateRange: string) => (
                   <React.Fragment key={dateRange}>
-                    <tr>
-                      <td className="px-6 py-4" colSpan={5}><span>{dateRange}</span></td>
+                    <tr className='date-range-row'>
+                      <td className="px-5 py-3" colSpan={5}><span>{dateRange}</span></td>
                       <td>
                         <button
                           onClick={() => addItem(groupedItems[dateRange][0])}
@@ -303,7 +303,7 @@ function CreateQuote() {
           <Col style={{textAlign: 'right', marginTop: '2rem'}}>
             <Button variant='default' onClick={goBack}>Cancel</Button>
             <Button variant='primary' onClick={handleConvertQuote} disabled={isSaving}>
-              Create {isSaving && <Spinner variant='light' size='sm' />}
+              Convert {isSaving && <Spinner variant='light' size='sm' />}
             </Button>
           </Col>
         </Row>
