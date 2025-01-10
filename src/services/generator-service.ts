@@ -19,7 +19,8 @@ class GeneratorService {
   }
 
   async postRequirement(requestBody: any): Promise<any> {
-    return await this.postRequest('hello', requestBody);
+    const response = await this.postRequest('api/quote/init', requestBody);
+    return response.json();
   }
 }
 

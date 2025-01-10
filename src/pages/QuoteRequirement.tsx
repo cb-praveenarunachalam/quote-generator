@@ -2,14 +2,20 @@ import { useState } from 'react';
 import { Button, Col, Container, Form, Row } from 'react-bootstrap';
 import './quote-requirement.css';
 import generatorService from '../services/generator-service';
+import { useNavigate } from 'react-router';
 
 function QuoteRequirement() {
   const formInitialState = {
-    requirement: ''
+    prompt: '',
+    contractStartDate: '',
+    contractEndDate: ''
   };
+
+  const navigate = useNavigate();
+
   const [formValues, setFormValues] = useState({...formInitialState});
 
-  const handleFormUpdate = (eventObject: any) => {
+  const handleFormChange = (eventObject: any) => {
     setFormValues({
       ...formValues,
       [eventObject.target.name]: eventObject.target.value
@@ -18,8 +24,19 @@ function QuoteRequirement() {
 
   const handleFormSubmit = async (eventObject: any) => {
     eventObject.preventDefault();
-    const response = await generatorService.postRequirement(formValues);
-    console.log('response', response);
+    const response = await generatorService.postRequirement({
+      ...formValues,
+      contractStartDate: convertDateToTimestamp(formValues.contractStartDate),
+      contractEndDate: convertDateToTimestamp(formValues.contractEndDate)
+    });
+
+    if (!response.status) {
+      navigate('/create-quote', { state: {quote: response} });
+    }
+  };
+
+  const convertDateToTimestamp = (dateAsString: string): number => {
+    return Math.floor(new Date(dateAsString).getTime() / 1000)
   };
 
   const handleFormReset = () => {
@@ -36,10 +53,24 @@ function QuoteRequirement() {
         </Row>
         <Form className="max-w-6xl mx-auto bg-white rounded-lg shadow-lg p-6">
           <Row>
+            <Col xs={6}>
+              <Form.Group className="mb-3">
+                <Form.Label>Contract start date</Form.Label>
+                <Form.Control type='date' name='contractStartDate' value={formValues.contractStartDate} onChange={handleFormChange} />
+              </Form.Group>
+            </Col>
+            <Col xs={6}>
+              <Form.Group className="mb-3">
+                <Form.Label>Contract end date</Form.Label>
+                <Form.Control type='date' name='contractEndDate' value={formValues.contractEndDate} onChange={handleFormChange} />
+              </Form.Group>
+            </Col>
+          </Row>
+          <Row>
             <Col>
-              <Form.Group className="mb-3" controlId="requirement">
-                <Form.Label>Requirement</Form.Label>
-                <Form.Control as="textarea" rows={3} name='requirement' onChange={handleFormUpdate} value={formValues.requirement} />
+              <Form.Group className="mb-3" controlId="prompt">
+                <Form.Label>Requirements</Form.Label>
+                <Form.Control as="textarea" rows={3} name='prompt' onChange={handleFormChange} value={formValues.prompt} placeholder='Enter the requirements for the subscription' />
               </Form.Group>
             </Col>
           </Row>

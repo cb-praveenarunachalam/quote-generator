@@ -1,49 +1,63 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { PlusCircle, Trash2, Quote as QuoteIcon } from 'lucide-react';
-import { Button, Col, Row } from 'react-bootstrap';
-import { useNavigate } from 'react-router';
+import { Button, Col, Form, Row } from 'react-bootstrap';
+import { useLocation, useNavigate } from 'react-router';
+import groupBy from 'lodash.groupby';
+import { format } from 'date-fns';
 
 interface QuoteItem {
   id: number;
-  description: string;
+  dateTo?: number;
+  dateFrom?: number;
+  currencyCode?: string;
+  name: string;
   quantity: number;
-  unitPrice: number;
-  billingFrequency: typeof BILLING_FREQUENCIES[number];
+  price: number;
+  billingFrequency: string;
 }
 
 const CURRENCIES = [
-  { code: 'USD', symbol: '$' },
-  { code: 'EUR', symbol: '€' },
-  { code: 'GBP', symbol: '£' },
-  { code: 'JPY', symbol: '¥' },
-  { code: 'AUD', symbol: 'A$' },
-  { code: 'CAD', symbol: 'C$' },
+  'USD',
+  'EUR',
+  'INR'
 ] as const;
 
 const BILLING_FREQUENCIES = [
-  { value: 'daily', label: 'Per Day' },
-  { value: 'weekly', label: 'Per Week' },
-  { value: 'monthly', label: 'Per Month' },
-  { value: 'yearly', label: 'Per Year' },
+  { value: 'Quarterly', label: 'Quarterly' },
+  { value: 'Monthly', label: 'Monthly' },
+  { value: 'Half-yearly', label: 'Half-yearly' },
+  { value: 'Yearly', label: 'Yearly' },
 ] as const;
 
 function CreateQuote() {
   const navigate = useNavigate();
+  const {state} = useLocation();
+  const { quote } = state;
 
-  const [items, setItems] = useState<QuoteItem[]>([]);
+  const [items, setItems] = useState<QuoteItem[]>(quote?.items ?? []);
   const [companyName, setCompanyName] = useState('');
   const [clientName, setClientName] = useState('');
-  const [currency, setCurrency] = useState<any>(CURRENCIES[0]);
-  const [defaultBillingFrequency, setDefaultBillingFrequency] = useState<any>(BILLING_FREQUENCIES[0]);
+  const [currency, setCurrency] = useState<string>(CURRENCIES[0]);
+  const [defaultBillingFrequency, setDefaultBillingFrequency] = useState<string>(BILLING_FREQUENCIES[0].value);
+  const [quoteSummary, setQuoteSummary] = useState<string>(quote.explanation?.replaceAll('\\\\n', '\n'));
+  const [groupedItems, setGroupedItems] = useState<Record<string, any>>({});
+
+  useEffect(() => {
+    const groupedEntries = groupBy(items, (item) => {
+      return `${convertTimestampToDate(item.dateFrom || 0)} to ${convertTimestampToDate(item.dateTo || 0)}`;
+    });
+
+    setGroupedItems(groupedEntries);
+  }, [items]);
 
   const addItem = () => {
     setItems([
       ...items,
       {
         id: Date.now(),
-        description: '',
+        name: '',
         quantity: 1,
-        unitPrice: 0,
+        price: 0,
         billingFrequency: defaultBillingFrequency,
       },
     ]);
@@ -62,13 +76,13 @@ function CreateQuote() {
   };
 
   const calculateTotal = () => {
-    return items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+    return items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
   };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: currency.code,
+      currency: currency,
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(amount);
@@ -76,6 +90,10 @@ function CreateQuote() {
 
   const goBack = () => {
     navigate('/');
+  };
+
+  const convertTimestampToDate = (timestamp: number) => {
+    return format(new Date(timestamp*1000), 'dd-MM-yyyy');
   };
 
   return (
@@ -98,7 +116,7 @@ function CreateQuote() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Client Name</label>
+            <label className="block text-sm font-medium text-gray-700">Customer Name</label>
             <input
               type="text"
               value={clientName}
@@ -113,22 +131,24 @@ function CreateQuote() {
           <div>
             <label className="block text-sm font-medium text-gray-700">Currency</label>
             <select
-              value={currency.code}
-              onChange={(e) => setCurrency(CURRENCIES.find(c => c.code === e.target.value) || CURRENCIES[0])}
+              value={currency}
+              onChange={(e) => setCurrency(CURRENCIES.find(c => c === e.target.value) || CURRENCIES[0])}
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
             >
               {CURRENCIES.map((curr) => (
-                <option key={curr.code} value={curr.code}>
-                  {curr.code} ({curr.symbol})
+                <option key={curr} value={curr}>
+                  {curr}
                 </option>
               ))}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Default Billing Frequency</label>
+            <label className="block text-sm font-medium text-gray-700">Billing Frequency</label>
             <select
-              value={defaultBillingFrequency.value}
-              onChange={(e) => setDefaultBillingFrequency(BILLING_FREQUENCIES.find(f => f.value === e.target.value) || BILLING_FREQUENCIES[0])}
+              value={defaultBillingFrequency}
+              onChange={(e) => {
+                setDefaultBillingFrequency(BILLING_FREQUENCIES.find(f => f.value === e.target.value)?.value || defaultBillingFrequency)
+              }}
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
             >
               {BILLING_FREQUENCIES.map((freq) => (
@@ -155,7 +175,7 @@ function CreateQuote() {
             <thead className="bg-gray-50">
               <tr>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Description
+                  Item name
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Quantity
@@ -175,74 +195,79 @@ function CreateQuote() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {items.map((item) => (
-                <tr key={item.id}>
-                  <td className="px-6 py-4">
-                    <input
-                      type="text"
-                      value={item.description}
-                      onChange={(e) => updateItem(item.id, 'description', e.target.value)}
-                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                      placeholder="Item description"
-                    />
-                  </td>
-                  <td className="px-6 py-4">
-                    <input
-                      type="number"
-                      value={item.quantity}
-                      onChange={(e) => updateItem(item.id, 'quantity', parseInt(e.target.value) || 0)}
-                      className="block w-24 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                      min="1"
-                    />
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="relative rounded-md shadow-sm">
-                      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                        <span className="text-gray-500 sm:text-sm">{currency.symbol}</span>
-                      </div>
-                      <input
-                        type="number"
-                        value={item.unitPrice}
-                        onChange={(e) => updateItem(item.id, 'unitPrice', parseFloat(e.target.value) || 0)}
-                        className="block w-32 rounded-md border-gray-300 pl-8 focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                        min="0"
-                        step="0.01"
-                      />
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <select
-                      value={item.billingFrequency.value}
-                      onChange={(e) => updateItem(
-                        item.id,
-                        'billingFrequency',
-                        BILLING_FREQUENCIES.find(f => f.value === e.target.value) || BILLING_FREQUENCIES[0]
-                      )}
-                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                    >
-                      {BILLING_FREQUENCIES.map((freq) => (
-                        <option key={freq.value} value={freq.value}>
-                          {freq.label}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-900">
-                    {formatCurrency(item.quantity * item.unitPrice)}
-                    <span className="text-xs text-gray-500 block">
-                      {item.billingFrequency.label}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <button
-                      onClick={() => removeItem(item.id)}
-                      className="text-red-600 hover:text-red-900"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {
+                Object.keys(groupedItems).map((dateRange: string) => (
+                  <React.Fragment key={dateRange}>
+                    <tr><td className="px-6 py-4" colSpan={6}><span>{dateRange}</span></td></tr>
+                    {groupedItems[dateRange].map((item: QuoteItem, index: number) => (
+                      <tr key={item.id || index}>
+                        <td className="px-6 py-4">
+                          <input
+                            type="text"
+                            value={item.name}
+                            onChange={(e) => updateItem(item.id, 'name', e.target.value)}
+                            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                            placeholder="Item name"
+                          />
+                        </td>
+                        <td className="px-6 py-4">
+                          <input
+                            type="number"
+                            value={item.quantity}
+                            onChange={(e) => updateItem(item.id, 'quantity', parseInt(e.target.value) || 0)}
+                            className="block w-24 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                            min="1"
+                          />
+                        </td>
+                        <td className="px-6 py-4 flex-cell">
+                          <span>{item.currencyCode}</span>
+                          <div className="relative rounded-md shadow-sm">
+                            <input
+                              type="number"
+                              value={item.price}
+                              onChange={(e) => updateItem(item.id, 'price', parseFloat(e.target.value) || 0)}
+                              className="block w-32 rounded-md border-gray-300 pl-8 focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                              min="0"
+                              step="0.01"
+                            />
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <select
+                            value={item.billingFrequency}
+                            onChange={(e) => updateItem(
+                              item.id,
+                              'billingFrequency',
+                              BILLING_FREQUENCIES.find(f => f.value === e.target.value)?.value || defaultBillingFrequency
+                            )}
+                            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                          >
+                            {BILLING_FREQUENCIES.map((freq) => (
+                              <option key={freq.value} value={freq.value}>
+                                {freq.label}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-900">
+                          {formatCurrency(item.quantity * item.price)}
+                          <span className="text-xs text-gray-500 block">
+                            {item.billingFrequency}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <button
+                            onClick={() => removeItem(item.id)}
+                            className="text-red-600 hover:text-red-900"
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </React.Fragment>
+                ))
+              }
             </tbody>
             <tfoot>
               <tr>
@@ -251,15 +276,16 @@ function CreateQuote() {
                 </td>
                 <td className="px-6 py-4 text-lg font-bold text-gray-900">
                   {formatCurrency(calculateTotal())}
-                  <span className="text-xs text-gray-500 block">
-                    (Mixed billing frequencies)
-                  </span>
                 </td>
                 <td></td>
               </tr>
             </tfoot>
           </table>
         </div>
+        <Row>
+          <Form.Label>Quote summary</Form.Label>
+          <Form.Control as='textarea' rows={3} value={quoteSummary} onChange={(event) => setQuoteSummary(event.target.value)} />
+        </Row>
         <Row>
           <Col style={{textAlign: 'right', marginTop: '2rem'}}>
             <Button variant='default' onClick={goBack}>Cancel</Button>
