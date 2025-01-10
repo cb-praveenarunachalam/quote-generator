@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Col, Container, Form, Row } from 'react-bootstrap';
+import { Button, Col, Container, Form, Row, Spinner } from 'react-bootstrap';
 import './quote-requirement.css';
 import generatorService from '../services/generator-service';
 import { useNavigate } from 'react-router';
@@ -7,12 +7,16 @@ import { useNavigate } from 'react-router';
 function QuoteRequirement() {
   const formInitialState = {
     prompt: '',
+    customerName: '',
+    companyName: '',
+    customerEmail: '',
     contractStartDate: '',
     contractEndDate: ''
   };
 
   const navigate = useNavigate();
 
+  const [isSaving, setIsSaving] = useState<boolean>(false);
   const [formValues, setFormValues] = useState({...formInitialState});
 
   const handleFormChange = (eventObject: any) => {
@@ -24,12 +28,14 @@ function QuoteRequirement() {
 
   const handleFormSubmit = async (eventObject: any) => {
     eventObject.preventDefault();
+    setIsSaving(true);
     const response = await generatorService.postRequirement({
       ...formValues,
       contractStartDate: convertDateToTimestamp(formValues.contractStartDate),
       contractEndDate: convertDateToTimestamp(formValues.contractEndDate)
     });
 
+    setIsSaving(false);
     if (!response.status) {
       navigate('/create-quote', { state: {quote: response} });
     }
@@ -48,10 +54,32 @@ function QuoteRequirement() {
       <Container fluid>
         <Row>
           <Col>
-            <h3>Smart quote generator</h3>
+            <h3>Quote generator</h3>
           </Col>
         </Row>
         <Form className="max-w-6xl mx-auto bg-white rounded-lg shadow-lg p-6">
+          <Row>
+            <Col xs={6}>
+              <Form.Group className="mb-3">
+                <Form.Label>Company name</Form.Label>
+                <Form.Control type='text' placeholder='Enter company name' name='companyName' value={formValues.companyName} onChange={handleFormChange} />
+              </Form.Group>
+            </Col>
+            <Col xs={6}>
+              <Form.Group className="mb-3">
+                <Form.Label>Customer name</Form.Label>
+                <Form.Control type='text' placeholder='Enter customer name' name='customerName' value={formValues.customerName} onChange={handleFormChange} />
+              </Form.Group>
+            </Col>
+          </Row>
+          <Row>
+            <Col xs={12}>
+              <Form.Group className="mb-3">
+                <Form.Label>Customer Email ID</Form.Label>
+                <Form.Control type='email' placeholder='Enter customer Email ID' name='customerEmail' value={formValues.customerEmail} onChange={handleFormChange} />
+              </Form.Group>
+            </Col>
+          </Row>
           <Row>
             <Col xs={6}>
               <Form.Group className="mb-3">
@@ -79,8 +107,8 @@ function QuoteRequirement() {
               <Button variant="default" onClick={handleFormReset}>
                 Reset
               </Button>
-              <Button variant="primary" className='submit-button' onClick={handleFormSubmit}>
-                Submit
+              <Button variant="primary" className='submit-button' onClick={handleFormSubmit} disabled={isSaving}>
+                Submit {isSaving && <Spinner variant='light' size='sm' />}
               </Button>
             </Col>
           </Row>

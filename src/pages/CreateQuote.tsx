@@ -1,14 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { PlusCircle, Trash2, Quote as QuoteIcon } from 'lucide-react';
-import { Button, Col, Form, Row } from 'react-bootstrap';
+import { Button, Col, Form, Row, Spinner } from 'react-bootstrap';
 import { useLocation, useNavigate } from 'react-router';
 import groupBy from 'lodash.groupby';
 import { format } from 'date-fns';
+import generatorService from '../services/generator-service';
 
 interface QuoteItem {
   id: number;
-  dateTo?: number;
-  dateFrom?: number;
+  dateTo: number;
+  dateFrom: number;
   currencyCode?: string;
   name: string;
   quantity: number;
@@ -31,31 +32,34 @@ const BILLING_FREQUENCIES = [
 
 function CreateQuote() {
   const navigate = useNavigate();
-  const {state} = useLocation();
-  const { quote } = state;
+  const { state } = useLocation();
+  const { quote } = state || {};
 
+  const [isSaving, setIsSaving] = useState<boolean>(false);
   const [items, setItems] = useState<QuoteItem[]>(quote?.items ?? []);
-  const [companyName, setCompanyName] = useState('');
-  const [clientName, setClientName] = useState('');
+  const [companyName, setCompanyName] = useState(quote?.companyName ?? '');
+  const [customerName, setCustomerName] = useState(quote?.customerName ?? '');
   const [currency, setCurrency] = useState<string>(CURRENCIES[0]);
-  const [defaultBillingFrequency, setDefaultBillingFrequency] = useState<string>(BILLING_FREQUENCIES[0].value);
-  const [quoteSummary, setQuoteSummary] = useState<string>(quote.explanation?.replaceAll('\\\\n', '\n'));
+  const [defaultBillingFrequency, setDefaultBillingFrequency] = useState<string>(items[0]?.billingFrequency || BILLING_FREQUENCIES[0].value);
+  const [quoteSummary, setQuoteSummary] = useState<string>(quote?.explanation?.replaceAll('\\\\n', '\n'));
   const [groupedItems, setGroupedItems] = useState<Record<string, any>>({});
 
   useEffect(() => {
     const groupedEntries = groupBy(items, (item) => {
-      return `${convertTimestampToDate(item.dateFrom || 0)} to ${convertTimestampToDate(item.dateTo || 0)}`;
+      return `${convertTimestampToDate(item.dateFrom)} to ${convertTimestampToDate(item.dateTo)}`;
     });
 
     setGroupedItems(groupedEntries);
   }, [items]);
 
-  const addItem = () => {
+  const addItem = (item: QuoteItem) => {
     setItems([
       ...items,
       {
         id: Date.now(),
         name: '',
+        dateFrom: item.dateFrom,
+        dateTo:  item.dateTo,
         quantity: 1,
         price: 0,
         billingFrequency: defaultBillingFrequency,
@@ -63,8 +67,8 @@ function CreateQuote() {
     ]);
   };
 
-  const removeItem = (id: number) => {
-    setItems(items.filter(item => item.id !== id));
+  const removeItem = (id: number, dateFrom: number, dateTo: number) => {
+    setItems(items.filter(item => item.id !== id && item.dateFrom !== dateFrom && item.dateTo === dateTo));
   };
 
   const updateItem = (id: number, field: keyof QuoteItem, value: any) => {
@@ -96,12 +100,18 @@ function CreateQuote() {
     return format(new Date(timestamp*1000), 'dd-MM-yyyy');
   };
 
+  const handleConvertQuote = async () => {
+    setIsSaving(true);
+    await generatorService.convertQuote(quote);
+    setIsSaving(false);
+  };
+
   return (
     <div className="min-h-screen py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-6xl mx-auto bg-white rounded-lg shadow-lg p-6">
         <div className="flex items-center gap-2 mb-8">
           <QuoteIcon className="w-8 h-8 text-blue-600" />
-          <h1 className="text-3xl font-bold text-gray-900">Create Quote</h1>
+          <h3 className="text-l text-gray-600">Create Quote</h3>
         </div>
 
         <div className="grid grid-cols-2 gap-6 mb-8">
@@ -119,10 +129,10 @@ function CreateQuote() {
             <label className="block text-sm font-medium text-gray-700">Customer Name</label>
             <input
               type="text"
-              value={clientName}
-              onChange={(e) => setClientName(e.target.value)}
+              value={customerName}
+              onChange={(e) => setCustomerName(e.target.value)}
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-              placeholder="Client Name"
+              placeholder="Customer Name"
             />
           </div>
         </div>
@@ -160,16 +170,6 @@ function CreateQuote() {
           </div>
         </div>
 
-        <div className="mb-4">
-          <button
-            onClick={addItem}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            <PlusCircle className="w-4 h-4 mr-2" />
-            Add Item
-          </button>
-        </div>
-
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -198,7 +198,18 @@ function CreateQuote() {
               {
                 Object.keys(groupedItems).map((dateRange: string) => (
                   <React.Fragment key={dateRange}>
-                    <tr><td className="px-6 py-4" colSpan={6}><span>{dateRange}</span></td></tr>
+                    <tr>
+                      <td className="px-6 py-4" colSpan={5}><span>{dateRange}</span></td>
+                      <td>
+                        <button
+                          onClick={() => addItem(groupedItems[dateRange][0])}
+                          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                        >
+                          <PlusCircle className="w-4 h-4 mr-2" />
+                          Add Item
+                        </button>
+                      </td>
+                    </tr>
                     {groupedItems[dateRange].map((item: QuoteItem, index: number) => (
                       <tr key={item.id || index}>
                         <td className="px-6 py-4">
@@ -219,14 +230,16 @@ function CreateQuote() {
                             min="1"
                           />
                         </td>
-                        <td className="px-6 py-4 flex-cell">
-                          <span>{item.currencyCode}</span>
+                        <td className="px-6 py-4 flex-cell" style={{position: 'relative'}}>
+                          <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 field-prefix">
+                            <span className="text-gray-500 sm:text-sm">{item.currencyCode}</span>
+                          </div>
                           <div className="relative rounded-md shadow-sm">
                             <input
                               type="number"
                               value={item.price}
                               onChange={(e) => updateItem(item.id, 'price', parseFloat(e.target.value) || 0)}
-                              className="block w-32 rounded-md border-gray-300 pl-8 focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                              className="block w-32 rounded-md border-gray-300 pl-10 focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                               min="0"
                               step="0.01"
                             />
@@ -257,7 +270,7 @@ function CreateQuote() {
                         </td>
                         <td className="px-6 py-4">
                           <button
-                            onClick={() => removeItem(item.id)}
+                            onClick={() => removeItem(item.id, item.dateFrom, item.dateTo)}
                             className="text-red-600 hover:text-red-900"
                           >
                             <Trash2 className="w-5 h-5" />
@@ -284,12 +297,14 @@ function CreateQuote() {
         </div>
         <Row>
           <Form.Label>Quote summary</Form.Label>
-          <Form.Control as='textarea' rows={3} value={quoteSummary} onChange={(event) => setQuoteSummary(event.target.value)} />
+          <Form.Control as='textarea' rows={10} value={quoteSummary} onChange={(event) => setQuoteSummary(event.target.value)} style={{backgroundColor: 'aliceblue'}} />
         </Row>
         <Row>
           <Col style={{textAlign: 'right', marginTop: '2rem'}}>
             <Button variant='default' onClick={goBack}>Cancel</Button>
-            <Button variant='primary'>Create</Button>
+            <Button variant='primary' onClick={handleConvertQuote} disabled={isSaving}>
+              Create {isSaving && <Spinner variant='light' size='sm' />}
+            </Button>
           </Col>
         </Row>
       </div>

@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
+.app-container {
   padding-right: 1.5rem;
   padding-left: 1.5rem;
 }
@@ -10,4 +10,36 @@ body {
 .flex-cell {
   display: flex;
   flex-wrap: nowrap;
+}
+
+input,
+select {
+  padding: .825rem;
+}
+
+.field-prefix {
+  left: 20px;
+  z-index: 1;
+}
+
+.nav-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.company-name {
+  font-weight: 800;
+  letter-spacing: 2.5px;
+  margin-left: 8px;
+  margin-bottom: 0;
+}
+
+.company-logo {
+  height: 35px;
+  width: 35px;
+}
+
+.bg-body-custom {
+  background-color: #012A38;
 }

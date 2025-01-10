@@ -22,6 +22,11 @@ class GeneratorService {
     const response = await this.postRequest('api/quote/init', requestBody);
     return response.json();
   }
+
+  async convertQuote(requestBody: any): Promise<any> {
+    const response = await this.postRequest('api/quote/convert', requestBody);
+    return response.json();
+  }
 }
 
 export default new GeneratorService();
